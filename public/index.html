@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"
+        integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+        
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+    <title>Editor</title>
+    <style type="text/css" media="screen">
+        body {
+            overflow: hidden;
+        }
+
+        .ace-chrome .ace_print-margin{
+            display: none;
+        }
+
+        #editor {
+            margin: 0;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 60%;
+        }
+        #s-1 .r-pane{
+            padding: 30px;
+            border: 1px solid #dadde0;
+        }
+        #s-1{
+            width: 100%;
+            max-width: 1300px;
+        }
+        #s-1 .output code{
+            width: 400px;
+            overflow: auto;
+            word-break: break-all;
+        } 
+        #test1,#test2{
+            height: 400px;
+            overflow: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="s-1" class="container">
+        <div class="row">
+            <div class="col l8 editor">
+                <pre id="editor"></pre>
+            </div>
+            <div class="col l4 r-pane">
+                <div class="wrap">
+                    <button class="btn waves-effect waves-light" onclick="compile()">Compile</button>
+                </div>
+                <div class="output" style="display: none">
+                    <div class="row">
+                        <div class="col s12">
+                            <ul class="tabs tabs-fixed-width">
+                                <li class="tab col s3 active"><a href="#test1">BYTECODE</a></li>
+                                <li class="tab col s3"><a href="#test2">ABI</a></li>
+                            </ul>
+                        </div>
+                        <div id="test1" class="col s12">
+
+                        </div>
+                        <div id="test2" class="col s12">
+
+                        </div>
+                    </div>
+                </div>
+                <div class="errors">
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="">
+    </div>
+
+    <script src="src/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        var editor = ace.edit("editor");
+        editor.setTheme("ace/theme/chrome");
+        editor.session.setMode("ace/mode/text");
+
+        editor.setValue(localStorage.getItem('content'));
+
+        function compile(){
+            $('#s-1 .output').hide();
+            var body = {
+                content: editor.getValue(),
+                filename: 'avc.sol'
+            }
+            localStorage.setItem('content', body.content);
+            $.ajax({
+                type: 'POST',
+                url: '/compile',
+                data: JSON.stringify(body),
+                contentType: 'application/json',
+                success: function (a, b, c) {
+                    if (b === 'success' && a.success) {
+                        $('#test1').html(`
+                            <code class="json">
+                                ${JSON.stringify(a.output.abi, undefined, 2)}    
+                            </code>
+                        `)
+                        $('#test2').html(`
+                            <code>
+                                ${JSON.stringify(a.output.bytecode, undefined, 2)}    
+                            </code>
+                        `)
+                        $('#s-1 .output').show();
+                    }
+                    else {
+                    }
+                },
+                error: function (a, b, c) {
+                }
+            });
+        }
+
+        $(document).ready(function(){
+            $('.tabs').tabs();
+        })
+
+    </script>
+
+</body>
+
+</html>
