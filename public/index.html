@@ -134,7 +134,7 @@
     <script>
         setEditor();
         function setEditor() {
-            var content = localStorage.getItem('content') || 'Pragma solidity 0.5.11';
+            var content = localStorage.getItem('content') || 'pragma solidity 0.5.0';
             window.editor = ace.edit("editor");
             editor.setTheme("ace/theme/xcode");
             editor.session.setMode("ace/mode/text");
