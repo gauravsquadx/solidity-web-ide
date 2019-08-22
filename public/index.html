@@ -134,10 +134,11 @@
     <script>
         setEditor();
         function setEditor() {
+            var content = localStorage.getItem('content') || 'Pragma solidity 0.4.23';
             window.editor = ace.edit("editor");
             editor.setTheme("ace/theme/xcode");
             editor.session.setMode("ace/mode/text");
-            editor.setValue(localStorage.getItem('content'));
+            editor.setValue(content);
             editor.setOption("showPrintMargin", false);
         }
 
