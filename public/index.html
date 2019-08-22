@@ -134,7 +134,18 @@
     <script>
         setEditor();
         function setEditor() {
-            var content = localStorage.getItem('content') || 'pragma solidity 0.5.0';
+            var content = localStorage.getItem('content') || 
+            `pragma solidity 0.5.11;
+
+             contract Form {
+                
+                uint8 field;
+                function setField(uint8 _field) public{
+                    field = _field;
+                
+                }
+                
+            }`;
             window.editor = ace.edit("editor");
             editor.setTheme("ace/theme/xcode");
             editor.session.setMode("ace/mode/text");
