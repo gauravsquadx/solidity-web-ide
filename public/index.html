@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"
         integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
-        
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
@@ -16,7 +16,7 @@
             overflow: hidden;
         }
 
-        .ace-chrome .ace_print-margin{
+        .ace-chrome .ace_print-margin {
             display: none;
         }
 
@@ -29,22 +29,58 @@
             right: 0;
             width: 60%;
         }
-        #s-1 .r-pane{
+
+        #s-1 .r-pane {
             padding: 30px;
             border: 1px solid #dadde0;
+            padding-bottom: 100px;
+            opacity: 0;
+            height: 96vh;
+            overflow: auto;
         }
-        #s-1{
+
+        #s-1 {
             width: 100%;
             max-width: 1300px;
         }
-        #s-1 .output code{
+
+        #s-1 .output code {
             width: 400px;
             overflow: auto;
             word-break: break-all;
-        } 
-        #test1,#test2{
+        }
+
+        #test1,
+        #test2 {
             height: 400px;
             overflow: auto;
+        }
+
+        .r-err::after {
+            content: 'x';
+            position: absolute;
+            width: 12px;
+            height: 16px;
+            background: red;
+            right: 0;
+            text-align: center;
+            color: #fff;
+        }
+
+        #s-1 .errors .card-box {
+            position: relative;
+            padding: 20px;
+            border-radius: 5px;
+            background-color: rgb(193, 0, 0);
+            color: #fff;
+            margin: 10px 0;
+        }
+
+        #s-1 .errors .card-box i {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -57,14 +93,23 @@
             </div>
             <div class="col l4 r-pane">
                 <div class="wrap">
-                    <button class="btn waves-effect waves-light" onclick="compile()">Compile</button>
+                    <!-- Dropdown Trigger -->
+                    <div class="input-field col s12 drop">
+                        <select>
+                        </select>
+                        <label>Select Compiler Version</label>
+                    </div>
+                    <div id="compile" style="padding-left: 15px">
+                        <button class="btn waves-effect waves-light" onclick="compile()">Compile</button>
+                        <i style="display: none;margin-left: 10px" class="fa fa-spinner fa-spin fa-forward"></i>
+                    </div>
                 </div>
-                <div class="output" style="display: none">
+                <div class="output" style="opacity: 0;height: 40px; overflow: hidden;">
                     <div class="row">
                         <div class="col s12">
                             <ul class="tabs tabs-fixed-width">
-                                <li class="tab col s3 active"><a href="#test1">BYTECODE</a></li>
-                                <li class="tab col s3"><a href="#test2">ABI</a></li>
+                                <li class="tab col s3 active"><a href="#test1">ABI</a></li>
+                                <li class="tab col s3"><a href="#test2">BYTECODE</a></li>
                             </ul>
                         </div>
                         <div id="test1" class="col s12">
@@ -76,7 +121,7 @@
                     </div>
                 </div>
                 <div class="errors">
-                    
+
                 </div>
             </div>
         </div>
@@ -87,19 +132,49 @@
 
     <script src="src/ace.js" type="text/javascript" charset="utf-8"></script>
     <script>
-        var editor = ace.edit("editor");
-        editor.setTheme("ace/theme/xcode");
-        editor.session.setMode("ace/mode/text");
+        setEditor();
+        function setEditor() {
+            window.editor = ace.edit("editor");
+            editor.setTheme("ace/theme/xcode");
+            editor.session.setMode("ace/mode/text");
+            editor.setValue(localStorage.getItem('content'));
+            editor.setOption("showPrintMargin", false);
+        }
 
-        editor.setValue(localStorage.getItem('content'));
+        function setErrors(err) {
+            var message = err.formattedMessage.split(' ');
+            message.shift();
+            message.pop();
+            message = message.join(' ');
+            $('#s-1 .errors').append(`
+                <div class="card-box">
+                    Error on line ${err.lineNumber}<br>
+                    <i class="fa fa-times"></i>
+                    ${message}
+                </div>
+            `)
+        }
 
-        function compile(){
-            $('#s-1 .output').hide();
+        function compile() {
+            $('#s-1 .output').css({
+                opacity: 0,
+                height: '40px',
+                overflow: 'hidden'
+            });
+            $('#compile button').attr('disabled', true);
+            $('#compile').find('i').show();
+            $('#s-1 .errors').html('');
             var body = {
                 content: editor.getValue(),
-                filename: 'avc.sol'
+                filename: 'avc.sol',
+                compiler: (function () {
+                    var val = $('.drop select').val();
+                    val = val.substring(0, val.length - 3);
+                    return val;
+                }())
             }
             localStorage.setItem('content', body.content);
+            $('#s-1 .ace_gutter-cell').removeClass('r-err');
             $.ajax({
                 type: 'POST',
                 url: '/compile',
@@ -117,9 +192,42 @@
                                 ${JSON.stringify(a.output.bytecode, undefined, 2)}    
                             </code>
                         `)
-                        $('#s-1 .output').show();
+                        $('#s-1 .output').css({ opacity: '1', overflow: 'auto', height: 'auto' });
                     }
                     else {
+                        a.output.errors.forEach((el, i) => {
+                            setErrors(el);
+                            $($('#s-1 .ace_gutter-cell')[el['lineNumber'] - 1]).addClass('r-err');
+                        });
+                        $('#s-1 .errors').find('i').click(function () {
+                            $(this).parent().remove();
+                        })
+                    }
+                    $('#compile').find('i').hide();
+                    $('#compile button').attr('disabled', false);
+                },
+                error: function (a, b, c) {
+                }
+            });
+        }
+
+        function setCompilerList() {
+            $.ajax({
+                type: 'get',
+                url: '/compile',
+                success: function (a, b, c) {
+                    if (b === 'success' && a.success) {
+                        // a.data = a.data.reverse();
+                        a.data.forEach(element => {
+                            $('.drop select').append(`
+                                <option value="${element.url}">${element.name}</option>
+                            `)
+                            $('select').formSelect();
+                        });
+                        $('.r-pane').css({ opacity: 1 });
+                    }
+                    else {
+
                     }
                 },
                 error: function (a, b, c) {
@@ -127,9 +235,121 @@
             });
         }
 
-        $(document).ready(function(){
+        $(document).ready(function () {
             $('.tabs').tabs();
         })
+        setCompilerList();
+
+        function deploy(){
+            var myContract = new web3.eth.contract(
+                [{
+                    "constant": true,
+                    "inputs": [],
+                    "name": "getUsers",
+                    "outputs": [{
+                        "name": "",
+                        "type": "uint256[]"
+                    }],
+                    "payable": false,
+                    "stateMutability": "view",
+                    "type": "function"
+                }, {
+                    "constant": true,
+                    "inputs": [{
+                        "name": "_rid",
+                        "type": "uint256"
+                    }],
+                    "name": "getRegistry",
+                    "outputs": [{
+                        "name": "",
+                        "type": "string"
+                    }],
+                    "payable": false,
+                    "stateMutability": "view",
+                    "type": "function"
+                }, {
+                    "constant": false,
+                    "inputs": [{
+                        "name": "_uid",
+                        "type": "uint256"
+                    }, {
+                        "name": "data",
+                        "type": "string"
+                    }],
+                    "name": "registerUser",
+                    "outputs": [],
+                    "payable": false,
+                    "stateMutability": "nonpayable",
+                    "type": "function"
+                }, {
+                    "constant": true,
+                    "inputs": [],
+                    "name": "getRegistries",
+                    "outputs": [{
+                        "name": "",
+                        "type": "uint256[]"
+                    }],
+                    "payable": false,
+                    "stateMutability": "view",
+                    "type": "function"
+                }, {
+                    "constant": false,
+                    "inputs": [{
+                        "name": "_rid",
+                        "type": "uint256"
+                    }, {
+                        "name": "_data",
+                        "type": "string"
+                    }],
+                    "name": "registery",
+                    "outputs": [],
+                    "payable": false,
+                    "stateMutability": "nonpayable",
+                    "type": "function"
+                }, {
+                    "constant": true,
+                    "inputs": [{
+                        "name": "_uid",
+                        "type": "uint256"
+                    }],
+                    "name": "getRegistredUser",
+                    "outputs": [{
+                        "name": "",
+                        "type": "string"
+                    }],
+                    "payable": false,
+                    "stateMutability": "view",
+                    "type": "function"
+                }, {
+                    "constant": true,
+                    "inputs": [],
+                    "name": "getGovtOfficers",
+                    "outputs": [{
+                        "name": "",
+                        "type": "address[]"
+                    }],
+                    "payable": false,
+                    "stateMutability": "view",
+                    "type": "function"
+                }, {
+                    "inputs": [],
+                    "payable": false,
+                    "stateMutability": "nonpayable",
+                    "type": "constructor"
+                }]
+            );
+            var compiledCode = '608060405234801561001057600080fd5b5033600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506109ee806100616000396000f300608060405260043610610082576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168062ce8e3e14610087578063193c045e146100f35780631c57333e1461019957806335884e5a1461020c578063477f65cd14610278578063c5bdcec2146102eb578063d573654714610391575b600080fd5b34801561009357600080fd5b5061009c6103fd565b6040518080602001828103825283818151815260200191508051906020019060200280838360005b838110156100df5780820151818401526020810190506100c4565b505050509050019250505060405180910390f35b3480156100ff57600080fd5b5061011e600480360381019080803590602001909291905050506104b1565b6040518080602001828103825283818151815260200191508051906020019080838360005b8381101561015e578082015181840152602081019050610143565b50505050905090810190601f16801561018b5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b3480156101a557600080fd5b5061020a60048036038101908080359060200190929190803590602001908201803590602001908080601f0160208091040260200160405190810160405280939291908181526020018383808284378201915050505050509192919290505050610566565b005b34801561021857600080fd5b50610221610618565b6040518080602001828103825283818151815260200191508051906020019060200280838360005b83811015610264578082015181840152602081019050610249565b505050509050019250505060405180910390f35b34801561028457600080fd5b506102e960048036038101908080359060200190929190803590602001908201803590602001908080601f01602080910402602001604051908101604052809392919081815260200183838082843782019150505050505091929192905050506106cc565b005b3480156102f757600080fd5b506103166004803603810190808035906020019092919050505061077e565b6040518080602001828103825283818151815260200191508051906020019080838360005b8381101561035657808201518184015260208101905061033b565b50505050905090810190601f1680156103835780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b34801561039d57600080fd5b506103a6610833565b6040518080602001828103825283818151815260200191508051906020019060200280838360005b838110156103e95780820151818401526020810190506103ce565b505050509050019250505060405180910390f35b6060600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614151561045b57600080fd5b60048054806020026020016040519081016040528092919081815260200182805480156104a757602002820191906000526020600020905b815481526020019060010190808311610493575b5050505050905090565b6060600560008381526020019081526020016000208054600181600116156101000203166002900480601f01602080910402602001604051908101604052809291908181526020018280546001816001161561010002031660029004801561055a5780601f1061052f5761010080835404028352916020019161055a565b820191906000526020600020905b81548152906001019060200180831161053d57829003601f168201915b50505050509050919050565b33600260008273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff1615156105bf57600080fd5b816003600085815260200190815260200160002090805190602001906105e692919061091d565b506004839080600181540180825580915050906001820390600052602060002001600090919290919091505550505050565b6060600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614151561067657600080fd5b60068054806020026020016040519081016040528092919081815260200182805480156106c257602002820191906000526020600020905b8154815260200190600101908083116106ae575b5050505050905090565b33600260008273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff16151561072557600080fd5b8160056000858152602001908152602001600020908051906020019061074c92919061091d565b506006839080600181540180825580915050906001820390600052602060002001600090919290919091505550505050565b6060600360008381526020019081526020016000208054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156108275780601f106107fc57610100808354040283529160200191610827565b820191906000526020600020905b81548152906001019060200180831161080a57829003601f168201915b50505050509050919050565b6060600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614151561089157600080fd5b600080548060200260200160405190810160405280929190818152602001828054801561091357602002820191906000526020600020905b8160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190600101908083116108c9575b5050505050905090565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f1061095e57805160ff191683800117855561098c565b8280016001018555821561098c579182015b8281111561098b578251825591602001919060010190610970565b5b509050610999919061099d565b5090565b6109bf91905b808211156109bb5760008160009055506001016109a3565b5090565b905600a165627a7a723058202c82d90f38277d3075550aa5f3b63c852f60ef91e711b4d011344a00bf7d7ca30029'
+            var newAddress = web3.eth.sendTransaction(
+                {
+                    data: compiledCode, 
+                    from: web3.eth.accounts[0], 
+                },
+                (err, data)=>{
+                    console.log(data);
+                }
+            )
+        }
+
 
     </script>
 
